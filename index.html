@@ -1118,17 +1118,14 @@
         form.addEventListener('submit', async function(e) {
             e.preventDefault(); 
 
-            // FIX: Leemos el DOM directamente para prevenir variables desincronizadas (ej. autocompletado)
-            const radioSeleccionado = document.querySelector('input[name="producto"]:checked');
-            const finalSelectedValue = radioSeleccionado ? radioSeleccionado.value : '1_par';
-            const productoSeleccionado = productos[finalSelectedValue];
-
             const nombre = document.getElementById('nombre').value.trim();
             const celular = document.getElementById('celular').value.trim();
             const direccion = document.getElementById('direccion').value.trim();
             const referencia = document.getElementById('referencia').value.trim();
             const departamento = deptoSelect.options[deptoSelect.selectedIndex]?.text || '';
             const ciudad = ciudadSelect.options[ciudadSelect.selectedIndex]?.text || '';
+
+            const productoSeleccionado = productos[currentSelectedValue];
             
             let precioFinalCalculado = productoSeleccionado.price;
             if (descuentoAplicado) precioFinalCalculado -= VALOR_DESCUENTO;
@@ -1143,19 +1140,23 @@
                     fn: nombre.toLowerCase()
                 });
 
-                let valorParaMeta = parseFloat(precioFinalCalculado);
+                // 1. Asegurarnos de que el precio sea un número válido y limpiar cualquier texto si lo hubiera
+let valorParaMeta = parseFloat(precioFinalCalculado);
 
-                if (isNaN(valorParaMeta) || valorParaMeta <= 0) {
-                    valorParaMeta = 99900; 
-                }
+// 2. Validar que sea un número mayor a 0. Si falla (NaN o 0), asignamos un valor de respaldo para no perder el trackeo.
+if (isNaN(valorParaMeta) || valorParaMeta <= 0) {
+    // Puedes poner el precio base de tu producto como respaldo por si falla la variable
+    valorParaMeta = 99900; 
+}
 
-                fbq('track', 'Purchase', {
-                    value: valorParaMeta,
-                    currency: 'COP',
-                    content_name: productoSeleccionado.name,
-                    content_ids: [finalSelectedValue],
-                    content_type: 'product'
-                });
+// 3. Enviar el evento con el valor corregido
+fbq('track', 'Purchase', {
+    value: valorParaMeta,
+    currency: 'COP',
+    content_name: productoSeleccionado.name,
+    content_ids: [currentSelectedValue],
+    content_type: 'product'
+});
             }
 
             // Order Data Object for Google Sheets
@@ -1223,10 +1224,7 @@
 
             // Wait for network requests
             await Promise.allSettled(envios);
-
-            // FIX: Incrementamos el tiempo de espera a 2000ms (2 segundos)
-            // Esto le da tiempo al Pixel de Meta de procesar y enviar el evento en conexiones 3G/Lentas
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 800));
 
             // 3. WhatsApp Redirect
             let mensaje = `🚨 *NUEVO PEDIDO (PAGO CONTRA ENTREGA)* 🚨\n\n`;
